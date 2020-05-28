@@ -206,7 +206,7 @@ def outbound_eks_nlb_setup(awsClient, manifest_data):
     if "outbound_vpcs_config" in manifest_data:
         outbound_vpc_cfg = manifest_data["outbound_vpcs_config"]
         outbound_infra_vpcs_info = list()
-        for vpc_suffix in outbound_vpc_cfg.keys():
+        for vpc_suffix in [str(key) for key in outbound_vpc_cfg.keys()]:
             # Update KUBECONFIG to OUTBOUND EKS Cluster
             cluster_name = "{}-{}-{}-{}-data-plane".format(
                 manifest_data["env_name"], manifest_data["region"], manifest_data["deployment_id"], "outbound-" + vpc_suffix
