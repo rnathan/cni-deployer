@@ -18,12 +18,12 @@ phases:
       - wget https://releases.hashicorp.com/terraform/"$TF_VERSION"/terraform_"$TF_VERSION"_linux_amd64.zip
       - unzip terraform_"$TF_VERSION"_linux_amd64.zip
       - mv terraform /usr/local/bin/
-  pre_build:
-    commands:
       - git clone https://"$GIT_USERNAME":"$GIT_PASSWORD"@github.com/sf-sdn/cni-deployer.git cni-deployer
       - cd cni-deployer
       - git fetch origin "$GIT_BRANCH"
       - git checkout "$GIT_BRANCH"
+  pre_build:
+    commands:
       - aws configure set default.s3.signature_version s3v4
   build:
     commands:
