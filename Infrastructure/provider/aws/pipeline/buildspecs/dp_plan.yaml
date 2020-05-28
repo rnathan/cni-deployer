@@ -21,6 +21,7 @@ phases:
         - cd cni-deployer
         - git fetch origin "$GIT_BRANCH"
         - git checkout "$GIT_BRANCH"
+        - git checkout "$GIT_COMMIT"
   build:
     commands:
         - MANIFEST_PATH="$CODEBUILD_SRC_DIR/aws/$ENV_NAME/$MANIFEST_FILENAME"

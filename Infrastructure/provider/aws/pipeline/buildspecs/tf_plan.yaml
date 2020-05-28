@@ -22,6 +22,7 @@ phases:
       - cd cni-deployer
       - git fetch origin "$GIT_BRANCH"
       - git checkout "$GIT_BRANCH"
+      - git checkout "$GIT_COMMIT"
   pre_build:
     commands:
       - aws configure set default.s3.signature_version s3v4

@@ -13,6 +13,10 @@ variable tags {
 variable git_branch {
   type = string
 }
+variable git_commit {
+  type    = string
+  default = "HEAD"
+}
 
 terraform {
   backend s3 {}
@@ -59,6 +63,11 @@ locals {
       name  = "GIT_BRANCH"
       type  = "PLAINTEXT"
       value = var.git_branch
+    },
+    {
+      name  = "GIT_COMMIT"
+      type  = "PLAINTEXT"
+      value = var.git_commit
     }
   ]
 }
