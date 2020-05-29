@@ -10,13 +10,6 @@ variable deployment_id {
 variable tags {
   type = map(string)
 }
-variable git_branch {
-  type = string
-}
-variable git_commit {
-  type    = string
-  default = "HEAD"
-}
 
 terraform {
   backend s3 {}
@@ -32,17 +25,17 @@ provider github {
 }
 
 locals {
-  resource_prefix     = join("-", [var.env_name, var.region, var.deployment_id])
-  manifest_filename   = "${local.resource_prefix}.yaml"
-  webhook_action_name = "CheckoutManifestSource"
-  repo_org            = "sf-sdn"
-  repo_name           = "cni-manifests"
-  branch_name         = "master"
-  plan_timeout        = "5"
-  apply_timeout       = "60"
-  git_token_secret_id = "SF-SDN-GIT-TOKEN"
-  git_token           = jsondecode(data.aws_secretsmanager_secret_version.github_oauth_token.secret_string)["GIT_PASSWORD"]
-  unary_module_names  = ["stack_base", "monitoring", "inbound_data_plane", "control_plane"]
+  resource_prefix       = join("-", [var.env_name, var.region, var.deployment_id])
+  manifest_filename     = "${local.resource_prefix}.yaml"
+  webhook_action_name   = "CheckoutManifestSource"
+  repo_org              = "sf-sdn"
+  repo_name             = "cni-manifests"
+  plan_timeout          = "5"
+  apply_timeout         = "60"
+  git_token_secret_id   = "SF-SDN-GIT-TOKEN"
+  git_token             = jsondecode(data.aws_secretsmanager_secret_version.github_oauth_token.secret_string)["GIT_PASSWORD"]
+  unary_module_names    = ["stack_base", "monitoring", "inbound_data_plane", "control_plane"]
+  data_plane_stage_name = "DataPlane"
   tf_codebuild_environment_variables = [
     {
       name  = "ENV_NAME"
@@ -58,16 +51,6 @@ locals {
       name  = "PIPELINE_S3_BUCKET"
       type  = "PLAINTEXT"
       value = module.pipeline_bucket.bucket.bucket
-    },
-    {
-      name  = "GIT_BRANCH"
-      type  = "PLAINTEXT"
-      value = var.git_branch
-    },
-    {
-      name  = "GIT_COMMIT"
-      type  = "PLAINTEXT"
-      value = var.git_commit
     }
   ]
 }
@@ -130,7 +113,7 @@ resource aws_codepipeline_webhook github_manifest {
 
   filter {
     json_path    = "$.ref"
-    match_equals = "refs/heads/${var.git_branch}"
+    match_equals = "refs/heads/master"
   }
 }
 
@@ -176,11 +159,8 @@ resource aws_codebuild_project terraform_plan {
   }
 
   source {
-    type = "CODEPIPELINE"
-    buildspec = templatefile("${path.module}/buildspecs/tf_plan.yaml", {
-      env_name        = var.env_name
-      resource_prefix = local.resource_prefix
-    })
+    type      = "CODEPIPELINE"
+    buildspec = file("${path.module}/buildspecs/tf_plan.yaml")
   }
 }
 
@@ -213,11 +193,8 @@ resource aws_codebuild_project terraform_apply {
   }
 
   source {
-    type = "CODEPIPELINE"
-    buildspec = templatefile("${path.module}/buildspecs/tf_apply.yaml", {
-      env_name        = var.env_name
-      resource_prefix = local.resource_prefix
-    })
+    type      = "CODEPIPELINE"
+    buildspec = file("${path.module}/buildspecs/tf_apply.yaml")
   }
 }
 
@@ -225,7 +202,7 @@ resource aws_codebuild_project terraform_apply {
 #  CodeBuild for EKS Dataplane Plan
 ###################################
 
-resource aws_codebuild_project dataplane_plan {
+resource aws_codebuild_project data_plane_plan {
   tags           = var.tags
   name           = "${local.resource_prefix}-dp-plan"
   service_role   = aws_iam_role.terraform_pipeline.arn
@@ -245,11 +222,8 @@ resource aws_codebuild_project dataplane_plan {
   }
 
   source {
-    type = "CODEPIPELINE"
-    buildspec = templatefile("${path.module}/buildspecs/dp_plan.yaml", {
-      env_name        = var.env_name
-      resource_prefix = local.resource_prefix
-    })
+    type      = "CODEPIPELINE"
+    buildspec = file("${path.module}/buildspecs/dp_plan.yaml")
   }
 }
 
@@ -257,7 +231,7 @@ resource aws_codebuild_project dataplane_plan {
 #  CodeBuild for TF Apply
 ###############################
 
-resource aws_codebuild_project dataplane_apply {
+resource aws_codebuild_project data_plane_apply {
   tags           = var.tags
   name           = "${local.resource_prefix}-dp-apply"
   service_role   = aws_iam_role.terraform_pipeline.arn
@@ -277,11 +251,8 @@ resource aws_codebuild_project dataplane_apply {
   }
 
   source {
-    type = "CODEPIPELINE"
-    buildspec = templatefile("${path.module}/buildspecs/dp_apply.yaml", {
-      env_name        = var.env_name
-      resource_prefix = local.resource_prefix
-    })
+    type      = "CODEPIPELINE"
+    buildspec = file("${path.module}/buildspecs/dp_apply.yaml")
   }
 }
 
@@ -317,7 +288,7 @@ resource aws_codepipeline stack {
       configuration = {
         Owner      = local.repo_org
         Repo       = local.repo_name
-        Branch     = var.git_branch
+        Branch     = "master"
         OAuthToken = local.git_token
       }
     }
@@ -394,21 +365,28 @@ resource aws_codepipeline stack {
   }
 
   stage {
-    name = "DataplaneDeployment"
+    name = local.data_plane_stage_name
 
     action {
-      name             = "DataplanePlan"
+      name             = "DataPlanePlan"
       category         = "Build"
       owner            = "AWS"
       provider         = "CodeBuild"
       input_artifacts  = ["ManifestSource"]
-      output_artifacts = ["DataplaneDeployment_plan"]
+      output_artifacts = ["${local.data_plane_stage_name}_plan"]
       version          = "1"
       run_order        = "1"
+      namespace        = local.data_plane_stage_name
 
       configuration = {
-        ProjectName          = aws_codebuild_project.dataplane_plan.name
-        EnvironmentVariables = jsonencode(local.tf_codebuild_environment_variables)
+        ProjectName = aws_codebuild_project.data_plane_plan.name
+        EnvironmentVariables = jsonencode(concat(local.tf_codebuild_environment_variables, [
+          {
+            name  = "STAGE_NAME"
+            type  = "PLAINTEXT"
+            value = local.data_plane_stage_name
+          }
+        ]))
       }
     }
 
@@ -419,20 +397,23 @@ resource aws_codepipeline stack {
       provider  = "Manual"
       version   = "1"
       run_order = "2"
+      configuration = {
+        ExternalEntityLink = "#{${local.data_plane_stage_name}.PRESIGNED_PLAN_S3_URL}"
+      }
     }
 
     action {
-      name             = "DataplaneApply"
+      name             = "DataPlaneApply"
       category         = "Build"
       owner            = "AWS"
       provider         = "CodeBuild"
-      input_artifacts  = ["DataplaneDeployment_plan"]
+      input_artifacts  = ["${local.data_plane_stage_name}_plan"]
       output_artifacts = []
       version          = "1"
       run_order        = "3"
 
       configuration = {
-        ProjectName          = aws_codebuild_project.dataplane_apply.name
+        ProjectName          = aws_codebuild_project.data_plane_apply.name
         EnvironmentVariables = jsonencode(local.tf_codebuild_environment_variables)
       }
     }
