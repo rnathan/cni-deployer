@@ -1,5 +1,4 @@
 import argparse
-import os
 import sys
 import subprocess
 import yaml
@@ -34,7 +33,8 @@ def validate_arguments(args):
 
 def update_kubeconfig(cluster_name, aws_region):
     # aws eks --region <region> update-kubeconfig --name <eks-cluster-name>
-    response = subprocess.run(["aws", "eks", "--region", aws_region, "update-kubeconfig", "--name", cluster_name])
+    program = ["aws", "eks", "--region", aws_region, "update-kubeconfig", "--name", cluster_name]
+    response = subprocess.run(program, capture_output=True)
     if response.returncode > 1:
         print(response)
         sys.exit("Updating KUBECONFIG failed")
@@ -140,7 +140,6 @@ def main():
     args = parser.parse_args()
     deploy_args = get_fixed_arguments(args)
 
-    print("Arguments: {}".format(deploy_args))
     validate_arguments(deploy_args)
     run(deploy_args)
 

@@ -1,13 +1,11 @@
 import os
 import sys
-import subprocess
-import yaml
+import time
+import json
 import boto3
 import botocore
-import time
 from kubernetes import client, config
 from eks_dataplane_deploy import *
-import json
 from pprint import pprint
 
 INBOUND_NAMESPACE = "cni-inbound"
