@@ -10,6 +10,9 @@ variable deployment_id {
 variable tags {
   type = map(string)
 }
+variable manifests_repo_branch {
+  type = string
+}
 
 terraform {
   backend s3 {}
@@ -107,7 +110,6 @@ resource github_repository_webhook github_manifest {
   configuration {
     url          = aws_codepipeline_webhook.github_manifest.url
     content_type = "json"
-    //    insecure_ssl = true
     secret = random_password.webhook_secret.result
   }
 
@@ -135,7 +137,7 @@ resource aws_codepipeline_webhook github_manifest {
 
   filter {
     json_path    = "$.ref"
-    match_equals = "refs/heads/master"
+    match_equals = "refs/heads/${var.manifests_repo_branch}"
   }
 }
 
