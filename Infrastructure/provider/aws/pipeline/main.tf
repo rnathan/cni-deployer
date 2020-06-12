@@ -130,7 +130,7 @@ resource aws_codepipeline_webhook github_manifest {
 
   filter {
     json_path    = "$.head_commit.modified"
-    match_equals = "/aws/${var.env_name}/${local.resource_prefix}.yaml"
+    match_equals = "aws/${var.env_name}/${local.resource_prefix}.yaml"
   }
 
   filter {
@@ -377,10 +377,11 @@ resource aws_codepipeline stack {
       version          = "1"
 
       configuration = {
-        Owner      = local.repo_org
-        Repo       = local.repo_name
-        Branch     = "master"
-        OAuthToken = local.git_token
+        Owner                = local.repo_org
+        Repo                 = local.repo_name
+        Branch               = "master"
+        OAuthToken           = local.git_token
+        PollForSourceChanges = false
       }
     }
   }
